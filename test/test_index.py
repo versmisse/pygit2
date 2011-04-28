@@ -59,6 +59,20 @@ class IndexTest(utils.RepoTestCase):
         self.assertEqual(index['hello.txt'].sha, sha)
         self.assertEqual(index[1].sha, sha)
 
+
+    def test_get(self):
+        index = self.repo.index
+
+        # Test a valid path
+        sha = 'a520c24d85fbfc815d385957eed41406ca5a860b'
+        entry = index.get('hello.txt')
+        self.assertEqual(entry.sha, sha)
+
+        # Test an invalid path / type
+        self.assertEqual(index.get('abc'), None)
+        self.assertRaises(TypeError, index.get, 1)
+
+
     def test_add(self):
         index = self.repo.index
 

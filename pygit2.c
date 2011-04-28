@@ -285,6 +285,29 @@ Repository_getitem(Repository *self, PyObject *value) {
     return (PyObject*)py_obj;
 }
 
+static PyObject *
+Repository_get(Repository *self, PyObject *py_sha) {
+    git_oid oid;
+    int err;
+    git_object *obj;
+    Object *py_obj;
+
+    /* 1- Translate the sha */
+    if (!py_str_to_git_oid(py_sha, &oid))
+        return NULL;
+
+    /* 2- Pick the object */
+    err = git_object_lookup(&obj, self->repo, &oid, GIT_OBJ_ANY);
+    if (err < 0)
+        Py_RETURN_NONE;
+
+    /* 3- Wrap and return it */
+    py_obj = wrap_object(obj, self);
+    if (!py_obj)
+        return NULL;
+    return (PyObject*)py_obj;
+}
+
 static int
 Repository_read_raw(git_odb_object **obj, git_repository *repo,
                     const git_oid *oid) {
@@ -657,6 +680,8 @@ static PyMethodDef Repository_methods[] = {
      "\"target\"."},
     {"packall_references", (PyCFunction)Repository_packall_references,
      METH_NOARGS, "Pack all the loose references in the repository."},
+    {"get", (PyCFunction)Repository_get, METH_O,
+     "Return the object given by its \"sha\" or None."},
     {NULL}
 };
 
@@ -1170,6 +1195,31 @@ Tree_getitem(Tree *self, PyObject *value) {
     }
 }
 
+static PyObject *
+Tree_get(Tree *self, PyObject *py_name) {
+    char *c_name;
+    const git_tree_entry *entry;
+
+    /* 1- Get the c_name */
+    c_name = PyString_AsString(py_name);
+    if (c_name == NULL)
+        return NULL;
+
+    /* 2- Pick the entry */
+    entry = git_tree_entry_byname(self->tree, c_name);
+    if (entry == NULL)
+        Py_RETURN_NONE;
+
+    /* 3- Wrap and return it */
+    return (PyObject *)wrap_tree_entry(entry, self);
+}
+
+static PyMethodDef Tree_methods[] = {
+    {"get", (PyCFunction)Tree_get, METH_O,
+     "Return the entry given by its \"name\" or its \"index\" or None."},
+    {NULL}
+};
+
 static PySequenceMethods Tree_as_sequence = {
     0,                          /* sq_length */
     0,                          /* sq_concat */
@@ -1216,7 +1266,7 @@ static PyTypeObject TreeType = {
     0,                                         /* tp_weaklistoffset */
     0,                                         /* tp_iter */
     0,                                         /* tp_iternext */
-    0,                                         /* tp_methods */
+    Tree_methods,                              /* tp_methods */
     0,                                         /* tp_members */
     0,                                         /* tp_getset */
     0,                                         /* tp_base */
@@ -1557,6 +1607,34 @@ Index_getitem(Index *self, PyObject *value) {
     return (PyObject*)py_index_entry;
 }
 
+static PyObject *
+Index_get(Index *self, PyObject *py_path) {
+    const char * c_path;
+    int idx;
+    git_index_entry *index_entry;
+    IndexEntry *py_index_entry;
+
+    /* 1- Find the idx */
+    c_path = PyString_AsString(py_path);
+    if (c_path == NULL)
+        return NULL;
+    idx = git_index_find(self->index, c_path);
+    if (idx < 0)
+        Py_RETURN_NONE;
+
+    /* 2- Get the C entry, idx is good => no test */
+    index_entry = git_index_get(self->index, idx);
+
+    /* 3- Wrap and return it */
+    py_index_entry = (IndexEntry*)IndexEntryType.tp_alloc(&IndexEntryType, 0);
+    if (py_index_entry == NULL)
+        return PyErr_NoMemory();
+    py_index_entry->entry = index_entry;
+
+    Py_INCREF(py_index_entry);
+    return (PyObject*)py_index_entry;
+}
+
 static int
 Index_setitem(Index *self, PyObject *key, PyObject *value) {
     int err;
@@ -1600,6 +1678,8 @@ static PyMethodDef Index_methods[] = {
      "Add or update an index entry from a file in disk."},
     {"clear", (PyCFunction)Index_clear, METH_NOARGS,
      "Clear the contents (all the entries) of an index object."},
+    {"get", (PyCFunction)Index_get, METH_O,
+     "Return the entry given by its \"name\" or its \"position\" or None."},
     {"_find", (PyCFunction)Index_find, METH_O,
      "Find the first index of any entries which point to given path in the"
      " Git index."},

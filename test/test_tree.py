@@ -67,6 +67,17 @@ class TreeTest(utils.BareRepoTestCase):
         self.assertTreeEntryEqual(tree[-2], b_sha, 'b', 0100644)
         self.assertTreeEntryEqual(tree['b'], b_sha, 'b', 0100644)
 
+    def test_tree_get(self):
+        tree = self.repo[TREE_SHA]
+
+        # Test a valid entry
+        entry = tree.get('a')
+        self.assertEqual(entry.name, 'a')
+
+        # Test an invalid entry
+        self.assertEqual(tree.get('abcd'), None)
+        self.assertRaises(TypeError, tree.get, 0)
+
     def test_read_subtree(self):
         tree = self.repo[TREE_SHA]
         subtree_entry = tree['c']

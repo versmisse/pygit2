@@ -53,6 +53,18 @@ class RepositoryTest(utils.BareRepoTestCase):
         a2 = self.repo.read('7f129fd57e31e935c6d60a0c794efe4e6927664b')
         self.assertEqual((pygit2.GIT_OBJ_BLOB, 'a contents 2\n'), a2)
 
+    def test_get(self):
+        repo = self.repo
+
+        # Test a valid sha
+        commit_sha = '5fe808e8953c12735680c257f56600cb0de44b10'
+        commit = repo.get(commit_sha)
+        self.assertEqual(commit_sha, commit.sha)
+
+        # Test an invalid sha
+        bad_sha = '5555555555555555555555555555555555555555'
+        self.assertEqual(repo.get(bad_sha), None)
+
     def test_contains(self):
         self.assertRaises(TypeError, lambda: 123 in self.repo)
         self.assertRaises(ValueError, lambda: A_BIN_SHA in self.repo)
